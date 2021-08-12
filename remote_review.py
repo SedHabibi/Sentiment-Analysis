@@ -24,4 +24,5 @@ def review_classifier(reviewText):
     print(processed_data)
 
 
-review_classifier('The necklace was awesome')
+reviewText = input('Whats your review = ')
+review_classifier(reviewText)
