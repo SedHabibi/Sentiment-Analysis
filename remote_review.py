@@ -15,14 +15,19 @@ def review_classifier(reviewText):
     #Reloading models.
     classifier_model = pickle.load(file1)
     vocabulary_of_model = pickle.load(file2)
-    
     #Transforming user input review to fit in the model.
     new_vectorizer = TfidfVectorizer(decode_error = 'replace', vocabulary = vocabulary_of_model)
     
     vectorized_new_data = new_vectorizer.fit_transform([reviewText])
     processed_data = classifier_model.predict(vectorized_new_data)
-    print(processed_data)
-
+    return processed_data
 
 reviewText = input('Whats your review = ')
 review_classifier(reviewText)
+
+if review_classifier(reviewText)[0] == 0:
+    print('Negative')
+elif review_classifier(reviewText)[0] == 1:
+    print('Positive')
+else:
+    print('Review not valid!')
