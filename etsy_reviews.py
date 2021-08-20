@@ -6,12 +6,12 @@ Created on Mon Aug 16 13:31:37 2021
 """
 #Importing necessary libraries.
 import pickle
-import time as t
 import pandas as pd
 from selenium import webdriver
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 #Global variables.
+date = []
 person = []
 review_bag = []
 review_sentiment = []
@@ -22,7 +22,7 @@ def review_classifier(reviewText):
 
     file1 = open('review_model.pkl', 'rb')
     file2 = open('features.pkl', 'rb')
-    from sklearn.feature_extraction.text import TfidfVectorizer
+    
     #Reloading models.
     classifier_model = pickle.load(file1)
     vocabulary_of_model = pickle.load(file2)
@@ -32,8 +32,11 @@ def review_classifier(reviewText):
     vectorized_new_data = new_vectorizer.fit_transform([reviewText])
     processed_data = classifier_model.predict(vectorized_new_data)
     return processed_data[0]
+
+
 #Function to scrap data from the etsy site.
 def data_scrapper(page):
+    global date
     global person
     global review_bag
     global review_sentiment
@@ -58,7 +61,6 @@ def data_scrapper(page):
         
         #Clicking on each product.
         for i in range(len(products)):
-            t.sleep(3)
             try:
                 print('Clicking on product', i + 1)
                 products[i].find_element_by_tag_name('a').click()
@@ -69,78 +71,174 @@ def data_scrapper(page):
             windows = browser.window_handles
             browser.switch_to.window(windows[1])
             
-            #Getting person name and review from the product.
+            #Scrapping from the etsy site.
             try:
-                print('Getting the reviews from this product!')
-                #id for the review panel.
-                id1 = 'same-listing-reviews-panel'
+                #xpath for the review panel.
+                xpath2 = '//*[@id="same-listing-reviews-panel"]/div'
+                product_count = browser.find_element_by_xpath(xpath2)
+                product_count = product_count.find_elements_by_class_name('wt-grid__item-xs-12')
                 
-                #Getting number of reviews.
-                no_of_review = browser.find_element_by_id(id1)
-                no_of_review = len(no_of_review.find_elements_by_class_name('wt-grid__item-xs-12 '))
-                
-                #xpath for person name.
-                xpath2 = '//*[@id="same-listing-reviews-panel"]/div/div[{}]/div[1]/div[2]/p[1]'
-                
-                #ID for the review by the person.
-                review_id = "review-preview-toggle-{}"
-                
-                for review in range(1, no_of_review + 1):
-                    xpath2 = xpath2.format(review)
+                for review in range(1, len(product_count) + 1):
                     
-                    person_name = browser.find_element_by_xpath(xpath2).text
+                    #Person's name.
+                    person_xpath = '//*[@id="same-listing-reviews-panel"]/div/div[{}]/div[1]/div[2]/p[1]'
+                    person_xpath = review_xpath.format(review)
+                    person_data = browser.find_element_by_xpath(person_xpath).text
                     
-                    #Appending the name to a list and also making sure that there are no duplicates.
-                    
-                    if person_name[:person_name.find(',') - 6] not in person:
+                    #Conditional statements to make sure tht there are no duplicate entries.
+                    if person_data[:person_data.find(',') - 6] not in person:
                         try:
-                            person.append(person_name[:person_name.find(',') - 6])
+                            #Appendind person's name to the list.
+                            person.append(person_data[:person_data.find(',') - 6])
+                            
+                            #Appending the date to the list.
+                            date.append(person_data[person_data.find(',') - 6:])
+                            
                         except Exception:
-                            print('Person doesnt exist.')
-                    
-                    #Getting review.
-                    try:
-                        review_id = review_id.format(review - 1)
-                        
-                        review_data = browser.find_element_by_id(review_id).text
-                        
-                        #Appending the review in the review list and it's sentiment in the review_sentiment list.
-                        if review_data not in review_bag:
-                            try:
-                                review_bag.append(review_data)
-                                sentiment__ = review_classifier(review_data)
-                                review_sentiment.append(sentiment__)
-                                
-                            except:
-                                print('No review for this product.')
-                    
-                    except:
-                        print('No review.')
+                            person.append('Person not found.')
+                            date.append('Date not found.')
+                            
+                        #Getting the review and it's sentiment as well.
+                        try:
+                            review_xpath = '//*[@id="review-preview-toggle-{}"]'
+                            review_xpath = review_xpath.format(review - 1)
+                            product_review = browser.find_element_by_xpath(review_xpath).text
+                            
+                            #Appending the review.
+                            review_bag.append(product_review)
+                            
+                            #Appending the sentiment.
+                            review_sentiment.append(review_classifier(product_review))
+                        except Exception:
+                            #Error Handling
+                            review_bag.append('No reviews for this product.')
+                            review_sentiment.append(review_classifier('No reviews for this product.'))
+
+            except Exception:
+                try:
                 
-            
-            except:
-                print('\nProduct does not exist!')
-            
-    
-            
-            browser.close()
-            browser.switch_to_window(windows[0])
+                    #Alternate xpath for the products table.
+                    xpath3 = '//*[@id="reviews"]/div[2]/div[2]'
+                    product_count = browser.find_element_by_xpath(xpath3)
+                    product_count = product_count.find_elements_by_class_name('wt-grid__item-xs-12')
+                    
+                    for review2 in range(1, len(product_count) + 1):
+                        
+                        #Alternate xpath for the person name.
+                        person_xpath = '//*[@id="reviews"]/div[2]/div[2]/div[{}]/div[1]/p'
+                        person_xpath = person_xpath.format(review2)
+                        
+                        #Getting the person name.
+                        person_data = browser.find_element_by_xpath(person_xpath).text
+                        
+                        if person_data[:person_data.find(',') - 6] not in person:
+                            
+                            #Getting unique names and the review's corresponding dates.
+                            try:
+                                #Appendind person's name to the list.
+                                person.append(person_data[:person_data.find(',') - 6])
+                                
+                                #Appending the date to the list.
+                                date.append(person_data[person_data.find(',') - 6:])
+                            except:
+                                
+                                #Handing the error.
+                                person.append('Person not found.')
+                                date.append('Date not found.')
+                            
+                            #Getting the review and it's sentiment also.
+                            try:
+                                review_xpath = '//*[@id="review-preview-toggle-{}"]'
+                                review_xpath = review_xpath.format(review2 - 1)
+                                product_review = browser.find_element_by_xpath(review_xpath).text
+                                
+                                #Appending the review.
+                                review_bag.append(product_review)
+                                
+                                #Appending the sentiment.
+                                review_sentiment.append(review_classifier(product_review))
+                            except Exception:
+                                
+                                #Error Handling
+                                review_bag.append('No reviews for this product.')
+                                review_sentiment.append(review_classifier('No reviews for this product.'))
+                
+                except Exception:
+                    try:
+                        #Alternate xpath for the products table.
+                        xpath4 = '//*[@id="reviews"]/div[2]/div[2]'
+                        product_count = browser.find_element_by_xpath(xpath4)
+                        product_count = product_count.find_elements_by_class_name('wt-grid__item-xs-12')
+                         
+                        for review3 in range(1, len(product_count) + 1):
+                            
+                            #Alternate xpath for person name.
+                            person_xpath = '//*[@id="same-listing-reviews-panel"]/div/div[{}]/div[1]/p'
+                            person_xpath = person_xpath.format(review3)
+                            
+                            #Getting the name.
+                            person_data = browser.find_element_by_xpath(person_xpath).text
+                            
+                            if person_data[:person_data.find(',') - 6] not in person:
+                                #Getting unique names and the review's corresponding dates.
+                                try:
+                                    #Appendind person's name to the list.
+                                    person.append(person_data[:person_data.find(',') - 6])
+                                
+                                    #Appending the date to the list.
+                                    date.append(person_data[person_data.find(',') - 6:])
+                                except:
+                                    #Handing the error.
+                                    person.append('Person not found.')
+                                    date.append('Date not found.')
+                                
+                                #Getting the review and it's sentiment also.
+                                try:
+                                    review_xpath = '//*[@id="review-preview-toggle-{}"]'
+                                    review_xpath = review_xpath.format(review3 - 1)
+                                    product_review = browser.find_element_by_xpath(review_xpath).text
+                                
+                                    #Appending the review.
+                                    review_bag.append(product_review)
+                                
+                                    #Appending the sentiment.
+                                    review_sentiment.append(review_classifier(product_review))
+                                    
+                                except Exception:
+                                    #Error Handling
+                                    review_bag.append('No reviews for this product.')
+                                    review_sentiment.append(review_classifier('No reviews for this product.'))
+                                
+                    except Exception:
+                        print('No records found.')
+                        continue
         
-    except:
-        print('Page doesnt exist!')
+            #Closing the tab.
+            browser.close()
+            
+            #Changing the focus to the main tab.
+            browser.switch_to.window(windows[0])
     
-    print('\n')
-    if page == 250:
-        print('Closing Chrome!!')
-        browser.quit()
+    except Exception:
+        print('Terminating the process.')
     
+    browser.quit()
+            
+                            
 #Function to write the data into a csv file.
 def data_frame():
+    global date
+    global person
+    global review_bag
+    global review_sentiment
+    
+    #Making the data frame.
     df = pd.DataFrame()
     df['Name'] = person
     df['Review'] = review_bag
     df['Sentiment'] = review_sentiment
     
+    #Exporting the data frame into a csv file.
     df.to_csv('scrapped_reviews.csv', index = False)
     
 #Main function.
